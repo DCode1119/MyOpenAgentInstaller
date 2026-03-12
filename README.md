@@ -25,6 +25,8 @@ If you do not pass provider flags, the script now asks for them interactively du
 
 For automation or CI, pass the flags explicitly or use `-NonInteractive` to force omitted provider values to resolve to `no` without prompting.
 
+If you run the script again on a machine that already has `opencode`, it treats that run as a provider reconfiguration pass for Oh My OpenCode. Existing `oh-my-opencode.json` or `oh-my-opencode.jsonc` files are backed up before the installer rewrites provider-related settings.
+
 The supported provider values are:
 
 - `Claude`: `no`
@@ -81,6 +83,12 @@ Run without prompts and force omitted providers to `no`:
 .\install-opencode.ps1 -NonInteractive
 ```
 
+Re-run on an already installed machine to change providers interactively:
+
+```powershell
+.\install-opencode.ps1 -InstallMissingPrerequisites:$false
+```
+
 Skip automatic prerequisite installation and fail fast if something is missing:
 
 ```powershell
@@ -113,6 +121,12 @@ Skip automatic prerequisite installation and fail fast if something is missing:
 - it does not complete browser auth flows for providers
 - it does not overwrite an existing OpenCode config blindly
 - it does not require `bun` to run the plugin installer because `npx` is used as a fallback
+
+## Re-running safely
+
+- if `opencode` is already installed, the script skips reinstalling it and continues into Oh My OpenCode provider reconfiguration
+- before re-running the OmO installer, the script backs up existing `oh-my-opencode.json` and `oh-my-opencode.jsonc` files in detected user config directories
+- detected config locations may include `%APPDATA%\opencode` and `%USERPROFILE%\.config\opencode`
 
 After the install completes, open a new terminal and run:
 

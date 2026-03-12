@@ -209,10 +209,66 @@ function Refresh-Path {
     $env:Path = $mergedEntries -join ';'
 }
 
+function Get-OpenCodeConfigDirectories {
+    $directories = [System.Collections.Generic.List[string]]::new()
+
+    if (-not [string]::IsNullOrWhiteSpace($env:APPDATA)) {
+        [void]$directories.Add((Join-Path $env:APPDATA 'opencode'))
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+        [void]$directories.Add((Join-Path $env:USERPROFILE '.config\opencode'))
+    }
+
+    $uniqueDirectories = [System.Collections.Generic.List[string]]::new()
+    foreach ($directory in $directories) {
+        if (-not $uniqueDirectories.Contains($directory)) {
+            [void]$uniqueDirectories.Add($directory)
+        }
+    }
+
+    return $uniqueDirectories
+}
+
+function Backup-ExistingOhMyOpenCodeConfig {
+    $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $backedUpPaths = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($directory in Get-OpenCodeConfigDirectories) {
+        foreach ($fileName in @('oh-my-opencode.json', 'oh-my-opencode.jsonc')) {
+            $configPath = Join-Path $directory $fileName
+            if (-not (Test-Path $configPath)) {
+                continue
+            }
+
+            $backupPath = "$configPath.backup-$timestamp"
+            Copy-Item -Path $configPath -Destination $backupPath -Force
+            [void]$backedUpPaths.Add($backupPath)
+        }
+    }
+
+    return $backedUpPaths
+}
+
+function Get-DetectedOpenCodeConfigPaths {
+    $paths = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($directory in Get-OpenCodeConfigDirectories) {
+        foreach ($fileName in @('opencode.json', 'opencode.jsonc', 'oh-my-opencode.json', 'oh-my-opencode.jsonc')) {
+            $path = Join-Path $directory $fileName
+            if (Test-Path $path) {
+                [void]$paths.Add($path)
+            }
+        }
+    }
+
+    return $paths
+}
+
 function Install-OpenCode {
     if (Test-Command 'opencode') {
         Write-Success "OpenCode is already installed: $(opencode --version)"
-        return
+        return $false
     }
 
     Write-Step 'Installing OpenCode globally with npm'
@@ -221,6 +277,7 @@ function Install-OpenCode {
         throw 'Failed to install opencode-ai globally with npm.'
     }
     Assert-CommandAvailable -Name 'opencode' -DisplayName 'OpenCode'
+    return $true
 }
 
 function Install-OhMyOpenAgent {
@@ -271,7 +328,7 @@ function Invoke-Installer {
     }
 
     Write-Step 'Installing OpenCode'
-    Install-OpenCode
+    $openCodeInstalledNow = Install-OpenCode
 
     Write-Step 'Verifying OpenCode'
     if (-not (Test-Command 'opencode')) {
@@ -282,6 +339,17 @@ function Invoke-Installer {
     Write-Success "OpenCode installed: $opencodeVersion"
 
     if ($InstallOhMyOpenAgent) {
+        if ($openCodeInstalledNow) {
+            Write-Info 'Proceeding with initial Oh My OpenCode provider configuration.'
+        } else {
+            Write-Info 'OpenCode is already present. This run will update your Oh My OpenCode provider configuration.'
+        }
+
+        $backupPaths = Backup-ExistingOhMyOpenCodeConfig
+        foreach ($backupPath in $backupPaths) {
+            Write-Info "Backed up existing Oh My OpenCode config to: $backupPath"
+        }
+
         $resolvedProviders = Resolve-ProviderConfiguration -Interactive (Test-IsInteractiveSession)
         $omoFlags = @(
             "--claude=$($resolvedProviders.Claude)",
@@ -302,16 +370,14 @@ function Invoke-Installer {
     Write-Host "OpenCode version: $(opencode --version)" -ForegroundColor Green
 
     if ($InstallOhMyOpenAgent) {
-        $configDir = Join-Path $env:USERPROFILE '.config\opencode'
-        $jsonPath = Join-Path $configDir 'opencode.json'
-        $jsoncPath = Join-Path $configDir 'opencode.jsonc'
+        $detectedConfigPaths = Get-DetectedOpenCodeConfigPaths
 
-        if (Test-Path $jsonPath) {
-            Write-Info "Detected OpenCode config: $jsonPath"
-        } elseif (Test-Path $jsoncPath) {
-            Write-Info "Detected OpenCode config: $jsoncPath"
+        if ($detectedConfigPaths.Count -gt 0) {
+            foreach ($detectedConfigPath in $detectedConfigPaths) {
+                Write-Info "Detected config: $detectedConfigPath"
+            }
         } else {
-            Write-Info 'OpenCode config was not found in the default user config directory yet.'
+            Write-Info 'OpenCode or Oh My OpenCode config was not found in the default user config directories yet.'
         }
     }
 
