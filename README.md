@@ -21,7 +21,11 @@ By default, the PowerShell installer will:
 
 Note on naming: the GitHub repository is `oh-my-openagent`, but the installable package and CLI command are still `oh-my-opencode`.
 
-The script uses conservative defaults for provider flags:
+If you do not pass provider flags, the script now asks for them interactively during the Oh My OpenCode step. Pressing Enter accepts the default of `no`.
+
+For automation or CI, pass the flags explicitly or use `-NonInteractive` to force omitted provider values to resolve to `no` without prompting.
+
+The supported provider values are:
 
 - `Claude`: `no`
 - `OpenAI`: `no`
@@ -31,7 +35,7 @@ The script uses conservative defaults for provider flags:
 - `Z.ai Coding Plan`: `no`
 - `OpenCode Go`: `no`
 
-Change those when you know which subscriptions you want to wire in.
+Explicit flag values always win over interactive prompts.
 
 ## Requirements
 
@@ -48,6 +52,8 @@ From PowerShell:
 Set-ExecutionPolicy -Scope Process Bypass
 .\install-opencode.ps1
 ```
+
+That command will ask about providers during execution unless you pass them explicitly.
 
 Or use the wrapper:
 
@@ -69,6 +75,12 @@ Install with GitHub Copilot fallback only:
 .\install-opencode.ps1 -Copilot yes
 ```
 
+Run without prompts and force omitted providers to `no`:
+
+```powershell
+.\install-opencode.ps1 -NonInteractive
+```
+
 Skip automatic prerequisite installation and fail fast if something is missing:
 
 ```powershell
@@ -84,6 +96,7 @@ Skip automatic prerequisite installation and fail fast if something is missing:
 - `-InstallNode` (default: `$true`)
 - `-InstallBun` (default: `$true`)
 - `-InstallOhMyOpenAgent` (default: `$true`) - installs the `oh-my-opencode` package from the `oh-my-openagent` project
+- `-NonInteractive` (default: off) - disables prompts and treats omitted provider values as `no`
 
 ### Provider flags
 
